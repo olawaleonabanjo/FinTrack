@@ -14,7 +14,7 @@ dotenv.config();
 // Initialize Database & Seed data if necessary
 initDatabase();
 
-const app = express();
+export const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
@@ -31,16 +31,27 @@ app.use((req, res, next) => {
   next();
 });
 
-// API Routes
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
+// Health check routes
+app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
+// Mount routes with and without /api prefix for seamless Vercel serverless and local dev routing
+app.use('/auth', authRouter);
 app.use('/api/auth', authRouter);
+
+app.use('/accounts', accountsRouter);
 app.use('/api/accounts', accountsRouter);
+
+app.use('/transactions', transactionsRouter);
 app.use('/api/transactions', transactionsRouter);
+
+app.use('/budgets', budgetsRouter);
 app.use('/api/budgets', budgetsRouter);
+
+app.use('/goals', goalsRouter);
 app.use('/api/goals', goalsRouter);
+
+app.use('/analytics', analyticsRouter);
 app.use('/api/analytics', analyticsRouter);
 
 // Global Error Handler
@@ -49,7 +60,12 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   res.status(500).json({ error: 'Internal Server Error' });
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 FinTrack Backend Server running on http://localhost:${PORT}`);
-  console.log(`📡 API Endpoints available at http://localhost:${PORT}/api`);
-});
+// Start standalone HTTP listener only when run locally (not in serverless environment)
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`🚀 FinTrack Backend Server running on http://localhost:${PORT}`);
+    console.log(`📡 API Endpoints available at http://localhost:${PORT}/api`);
+  });
+}
+
+export default app;
