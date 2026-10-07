@@ -31,7 +31,11 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             </option>
           ))}
         </select>
-        {error && <span className="text-xs text-rose-500 mt-0.5">{error}</span>}
+        {error && (
+          <span className="text-xs text-rose-500 mt-0.5">
+            {typeof error === 'string' ? error : (error as any)?.message || String(error)}
+          </span>
+        )}
       </div>
     );
   }

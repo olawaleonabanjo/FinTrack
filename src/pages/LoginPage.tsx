@@ -36,6 +36,23 @@ export const LoginPage: React.FC = () => {
     },
   });
 
+  // Helper to ensure server errors are always parsed to strings
+  const extractErrorMessage = (err: any, fallback: string): string => {
+    if (!err) return fallback;
+    const raw = err.response?.data?.error ?? err.response?.data?.message ?? err.response?.data ?? err.message;
+    if (typeof raw === 'string') return raw;
+    if (raw && typeof raw === 'object') {
+      if (typeof raw.message === 'string') return raw.message;
+      if (typeof raw.error === 'string') return raw.error;
+      try {
+        return JSON.stringify(raw);
+      } catch {
+        return fallback;
+      }
+    }
+    return fallback;
+  };
+
   const onLoginSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
     setServerError(null);
@@ -45,7 +62,7 @@ export const LoginPage: React.FC = () => {
       setAuth(response.user, response.token);
       navigate('/');
     } catch (err: any) {
-      const message = err.response?.data?.error || 'Invalid email or password. Please try again.';
+      const message = extractErrorMessage(err, 'Invalid email or password. Please try again.');
       setServerError(message);
     } finally {
       setIsLoading(false);
@@ -61,7 +78,7 @@ export const LoginPage: React.FC = () => {
       setAuth(response.user, response.token);
       navigate('/');
     } catch (err: any) {
-      const message = err.response?.data?.error || 'Registration failed. Please try a different email.';
+      const message = extractErrorMessage(err, 'Registration failed. Please try a different email.');
       setServerError(message);
     } finally {
       setIsLoading(false);
@@ -125,14 +142,14 @@ export const LoginPage: React.FC = () => {
           {sessionExpiredMessage && (
             <div className="mb-5 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2.5">
               <Clock className="w-4 h-4 flex-shrink-0 text-amber-400" />
-              <span>{sessionExpiredMessage}</span>
+              <span>{typeof sessionExpiredMessage === 'string' ? sessionExpiredMessage : String(sessionExpiredMessage)}</span>
             </div>
           )}
 
           {serverError && (
             <div className="mb-5 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2.5">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
-              <span>{serverError}</span>
+              <span>{typeof serverError === 'string' ? serverError : (serverError as any)?.message || String(serverError)}</span>
             </div>
           )}
 
