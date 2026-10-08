@@ -1,6 +1,8 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import { connectDB } from './db';
 import { authRouter } from './routes/auth';
 import { accountsRouter } from './routes/accounts';
@@ -9,7 +11,6 @@ import { budgetsRouter } from './routes/budgets';
 import { goalsRouter } from './routes/goals';
 import { analyticsRouter } from './routes/analytics';
 
-dotenv.config();
 
 export const app = express();
 const PORT = process.env.PORT || 5000;

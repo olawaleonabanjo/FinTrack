@@ -1,13 +1,5 @@
 import mongoose from 'mongoose';
 
-const MONGODB_URI = process.env.MONGODB_URI || '';
-
-if (!MONGODB_URI) {
-  console.error('[DATABASE:INIT] ❌ MONGODB_URI environment variable is not set!');
-  console.error('[DATABASE:INIT] Add MONGODB_URI to your .env file or Vercel environment variables.');
-  process.exit(1);
-}
-
 // Connection state tracking
 let isConnected = false;
 
@@ -19,6 +11,15 @@ export async function connectDB(): Promise<void> {
   if (isConnected && mongoose.connection.readyState === 1) {
     console.log('[DATABASE:INIT] ✅ Reusing existing MongoDB connection.');
     return;
+  }
+
+  // Read MONGODB_URI here (after dotenv.config() has been called)
+  const MONGODB_URI = process.env.MONGODB_URI || '';
+
+  if (!MONGODB_URI) {
+    console.error('[DATABASE:INIT] ❌ MONGODB_URI environment variable is not set!');
+    console.error('[DATABASE:INIT] Add MONGODB_URI to your .env file or Vercel environment variables.');
+    process.exit(1);
   }
 
   try {
