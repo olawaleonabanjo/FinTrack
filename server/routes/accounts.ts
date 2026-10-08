@@ -1,48 +1,51 @@
 import { Router, Response } from 'express';
-import { db } from '../db';
+import { Account } from '../models/Account';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth';
 
 export const accountsRouter = Router();
 
 accountsRouter.use(requireAuth);
 
-function formatAccount(row: any) {
+function formatAccount(doc: any) {
   return {
-    id: row.id,
-    name: row.name,
-    type: row.type,
-    balance: Number(row.balance),
-    accountNumber: row.account_number,
-    institution: row.institution,
-    color: row.color,
-    currency: row.currency,
-    updatedAt: row.updated_at,
+    id: doc._id,
+    name: doc.name,
+    type: doc.type,
+    balance: Number(doc.balance),
+    accountNumber: doc.account_number,
+    institution: doc.institution,
+    color: doc.color,
+    currency: doc.currency,
+    updatedAt: doc.updated_at,
   };
 }
 
 // GET /api/accounts
-accountsRouter.get('/', (req: AuthenticatedRequest, res: Response) => {
+accountsRouter.get('/', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
-    const rows = db
-      .prepare('SELECT * FROM accounts WHERE user_id = ? ORDER BY balance DESC')
-      .all(userId);
+    const docs = await Account.find({ user_id: userId }).sort({ balance: -1 }).lean();
 
-    const accounts = rows.map(formatAccount);
-    return res.json(accounts);
+    console.log('[ACCOUNTS:GET] ✅ Fetched accounts.', { userId, count: docs.length });
+    return res.json(docs.map(formatAccount));
   } catch (err: any) {
-    console.error('Error fetching accounts:', err);
+    console.error('[ACCOUNTS:GET] ❌ Failed to fetch accounts.', {
+      userId: req.user?.id,
+      message: err.message,
+      stack: err.stack,
+    });
     return res.status(500).json({ error: 'Failed to fetch accounts' });
   }
 });
 
 // POST /api/accounts
-accountsRouter.post('/', (req: AuthenticatedRequest, res: Response) => {
+accountsRouter.post('/', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const { name, type, balance, accountNumber, institution, color, currency } = req.body;
 
     if (!name || !type || balance === undefined || !accountNumber || !institution) {
+      console.warn('[ACCOUNTS:POST] ⚠️ Missing required fields.', { name, type, balance, accountNumber, institution });
       return res.status(400).json({ error: 'Missing required account fields' });
     }
 
@@ -51,45 +54,53 @@ accountsRouter.post('/', (req: AuthenticatedRequest, res: Response) => {
     const finalColor = color || (type === 'checking' ? '#6366f1' : type === 'savings' ? '#10b981' : type === 'credit' ? '#f43f5e' : '#06b6d4');
     const finalCurrency = currency || req.user!.currency || 'USD';
 
-    db.prepare(`
-      INSERT INTO accounts (id, user_id, name, type, balance, account_number, institution, color, currency, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      id,
-      userId,
-      name.trim(),
+    const created = await Account.create({
+      _id: id,
+      user_id: userId,
+      name: name.trim(),
       type,
-      Number(balance),
-      accountNumber.trim(),
-      institution.trim(),
-      finalColor,
-      finalCurrency,
-      now
-    );
+      balance: Number(balance),
+      account_number: accountNumber.trim(),
+      institution: institution.trim(),
+      color: finalColor,
+      currency: finalCurrency,
+      updated_at: now,
+    });
 
-    const created = db.prepare('SELECT * FROM accounts WHERE id = ?').get(id);
+    console.log('[ACCOUNTS:POST] ✅ Account created.', { userId, accountId: id });
     return res.status(201).json(formatAccount(created));
   } catch (err: any) {
-    console.error('Error creating account:', err);
+    console.error('[ACCOUNTS:POST] ❌ Failed to create account.', {
+      userId: req.user?.id,
+      message: err.message,
+      stack: err.stack,
+    });
     return res.status(500).json({ error: 'Failed to create account' });
   }
 });
 
 // DELETE /api/accounts/:id
-accountsRouter.delete('/:id', (req: AuthenticatedRequest, res: Response) => {
+accountsRouter.delete('/:id', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const id = String(req.params.id);
 
-    const account = db.prepare('SELECT id FROM accounts WHERE id = ? AND user_id = ?').get(id, userId);
-    if (!account) {
+    const result = await Account.deleteOne({ _id: id, user_id: userId });
+
+    if (result.deletedCount === 0) {
+      console.warn('[ACCOUNTS:DELETE] ⚠️ Account not found.', { userId, accountId: id });
       return res.status(404).json({ error: 'Account not found' });
     }
 
-    db.prepare('DELETE FROM accounts WHERE id = ? AND user_id = ?').run(id, userId);
+    console.log('[ACCOUNTS:DELETE] ✅ Account deleted.', { userId, accountId: id });
     return res.json({ message: 'Account deleted successfully' });
   } catch (err: any) {
-    console.error('Error deleting account:', err);
+    console.error('[ACCOUNTS:DELETE] ❌ Failed to delete account.', {
+      userId: req.user?.id,
+      accountId: req.params.id,
+      message: err.message,
+      stack: err.stack,
+    });
     return res.status(500).json({ error: 'Failed to delete account' });
   }
 });

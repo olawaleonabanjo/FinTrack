@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
-import { db } from '../db';
+import { Account } from '../models/Account';
+import { Transaction } from '../models/Transaction';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth';
 
 export const analyticsRouter = Router();
@@ -23,12 +24,12 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 // GET /api/analytics
-analyticsRouter.get('/', (req: AuthenticatedRequest, res: Response) => {
+analyticsRouter.get('/', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
 
     // 1. Total balance & assets/liabilities from Accounts
-    const accounts = db.prepare('SELECT balance, type FROM accounts WHERE user_id = ?').all(userId) as any[];
+    const accounts = await Account.find({ user_id: userId }).lean();
     const totalBalance = accounts.reduce((acc, a) => acc + Number(a.balance), 0);
     const totalAssets = accounts
       .filter((a) => Number(a.balance) > 0)
@@ -38,7 +39,7 @@ analyticsRouter.get('/', (req: AuthenticatedRequest, res: Response) => {
       .reduce((acc, a) => acc + Math.abs(Number(a.balance)), 0);
 
     // 2. Transactions
-    const transactions = db.prepare('SELECT * FROM transactions WHERE user_id = ? ORDER BY date DESC').all(userId) as any[];
+    const transactions = await Transaction.find({ user_id: userId }).sort({ date: -1 }).lean();
 
     const now = new Date();
     const currentYear = now.getFullYear();
@@ -50,7 +51,7 @@ analyticsRouter.get('/', (req: AuthenticatedRequest, res: Response) => {
       return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
     });
 
-    // If no transactions in current month yet (e.g. at start of month), consider last 35 days
+    // If no transactions in current month yet, consider last 35 days
     if (monthlyTxs.length === 0 && transactions.length > 0) {
       const thirtyFiveDaysAgo = new Date(now.getTime() - 35 * 24 * 60 * 60 * 1000);
       monthlyTxs = transactions.filter((t) => new Date(t.date) >= thirtyFiveDaysAgo);
@@ -128,6 +129,8 @@ analyticsRouter.get('/', (req: AuthenticatedRequest, res: Response) => {
       { month: 'Oct', netWorth: Math.round(totalBalance), assets: Math.round(totalAssets), liabilities: Math.round(totalLiabilities) },
     ];
 
+    console.log('[ANALYTICS:GET] ✅ Analytics computed.', { userId, txCount: transactions.length, accountCount: accounts.length });
+
     return res.json({
       totalBalance,
       monthlyIncome,
@@ -140,7 +143,11 @@ analyticsRouter.get('/', (req: AuthenticatedRequest, res: Response) => {
       netWorthHistory,
     });
   } catch (err: any) {
-    console.error('Error computing analytics:', err);
+    console.error('[ANALYTICS:GET] ❌ Failed to compute analytics.', {
+      userId: req.user?.id,
+      message: err.message,
+      stack: err.stack,
+    });
     return res.status(500).json({ error: 'Failed to compute analytics' });
   }
 });

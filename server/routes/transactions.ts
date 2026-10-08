@@ -1,69 +1,71 @@
 import { Router, Response } from 'express';
-import { db } from '../db';
+import { Transaction } from '../models/Transaction';
+import { Account } from '../models/Account';
+import { Budget } from '../models/Budget';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth';
 
 export const transactionsRouter = Router();
 
 transactionsRouter.use(requireAuth);
 
-function formatTransaction(row: any) {
+function formatTransaction(doc: any) {
   return {
-    id: row.id,
-    title: row.title,
-    amount: Number(row.amount),
-    type: row.type,
-    category: row.category,
-    date: row.date,
-    accountId: row.account_id,
-    accountName: row.account_name,
-    status: row.status,
-    merchant: row.merchant || undefined,
-    notes: row.notes || undefined,
+    id: doc._id,
+    title: doc.title,
+    amount: Number(doc.amount),
+    type: doc.type,
+    category: doc.category,
+    date: doc.date,
+    accountId: doc.account_id,
+    accountName: doc.account_name,
+    status: doc.status,
+    merchant: doc.merchant || undefined,
+    notes: doc.notes || undefined,
   };
 }
 
 // GET /api/transactions
-transactionsRouter.get('/', (req: AuthenticatedRequest, res: Response) => {
+transactionsRouter.get('/', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const { accountId, category, type, search } = req.query;
 
-    let query = 'SELECT * FROM transactions WHERE user_id = ?';
-    const params: any[] = [userId];
+    const filter: any = { user_id: userId };
 
     if (accountId && accountId !== 'all') {
-      query += ' AND account_id = ?';
-      params.push(accountId);
+      filter.account_id = accountId;
     }
-
     if (category && category !== 'all') {
-      query += ' AND category = ?';
-      params.push(category);
+      filter.category = category;
     }
-
     if (type && type !== 'all') {
-      query += ' AND type = ?';
-      params.push(type);
+      filter.type = type;
     }
-
     if (search && typeof search === 'string' && search.trim() !== '') {
-      query += ' AND (title LIKE ? OR category LIKE ? OR merchant LIKE ?)';
-      const term = `%${search.trim()}%`;
-      params.push(term, term, term);
+      const regex = new RegExp(search.trim(), 'i');
+      filter.$or = [
+        { title: regex },
+        { category: regex },
+        { merchant: regex },
+      ];
     }
 
-    query += ' ORDER BY date DESC, created_at DESC';
+    const docs = await Transaction.find(filter).sort({ date: -1, created_at: -1 }).lean();
 
-    const rows = db.prepare(query).all(...params);
-    return res.json(rows.map(formatTransaction));
+    console.log('[TRANSACTIONS:GET] ✅ Fetched transactions.', { userId, count: docs.length });
+    return res.json(docs.map(formatTransaction));
   } catch (err: any) {
-    console.error('Error fetching transactions:', err);
+    console.error('[TRANSACTIONS:GET] ❌ Failed to fetch transactions.', {
+      userId: req.user?.id,
+      message: err.message,
+      stack: err.stack,
+    });
     return res.status(500).json({ error: 'Failed to fetch transactions' });
   }
 });
 
 // POST /api/transactions
-transactionsRouter.post('/', (req: AuthenticatedRequest, res: Response) => {
+transactionsRouter.post('/', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const {
@@ -80,6 +82,7 @@ transactionsRouter.post('/', (req: AuthenticatedRequest, res: Response) => {
     } = req.body;
 
     if (!title || amount === undefined || !type || !category || !date || !accountId) {
+      console.warn('[TRANSACTIONS:POST] ⚠️ Missing required fields.', { title, type, category, date, accountId });
       return res.status(400).json({ error: 'Missing required transaction fields' });
     }
 
@@ -89,11 +92,9 @@ transactionsRouter.post('/', (req: AuthenticatedRequest, res: Response) => {
     }
 
     // Verify account exists
-    const account = db
-      .prepare('SELECT id, name, balance FROM accounts WHERE id = ? AND user_id = ?')
-      .get(accountId, userId) as any;
-
+    const account = await Account.findOne({ _id: accountId, user_id: userId }).lean();
     if (!account) {
+      console.warn('[TRANSACTIONS:POST] ⚠️ Account not found.', { userId, accountId });
       return res.status(404).json({ error: 'Selected account not found' });
     }
 
@@ -102,24 +103,21 @@ transactionsRouter.post('/', (req: AuthenticatedRequest, res: Response) => {
     const now = new Date().toISOString();
 
     // 1. Insert Transaction
-    db.prepare(`
-      INSERT INTO transactions (id, user_id, account_id, account_name, title, amount, type, category, date, status, merchant, notes, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      id,
-      userId,
-      accountId,
-      finalAccountName,
-      title.trim(),
-      numAmount,
+    const created = await Transaction.create({
+      _id: id,
+      user_id: userId,
+      account_id: accountId,
+      account_name: finalAccountName,
+      title: title.trim(),
+      amount: numAmount,
       type,
       category,
       date,
       status,
-      merchant ? merchant.trim() : null,
-      notes ? notes.trim() : null,
-      now
-    );
+      merchant: merchant ? merchant.trim() : null,
+      notes: notes ? notes.trim() : null,
+      created_at: now,
+    });
 
     // 2. Automatically update Account Balance
     let balanceDelta = 0;
@@ -127,41 +125,41 @@ transactionsRouter.post('/', (req: AuthenticatedRequest, res: Response) => {
     else if (type === 'expense') balanceDelta = -numAmount;
 
     if (balanceDelta !== 0) {
-      db.prepare(`
-        UPDATE accounts
-        SET balance = balance + ?, updated_at = ?
-        WHERE id = ? AND user_id = ?
-      `).run(balanceDelta, now, accountId, userId);
+      await Account.updateOne(
+        { _id: accountId, user_id: userId },
+        { $inc: { balance: balanceDelta }, $set: { updated_at: now } }
+      );
     }
 
     // 3. Automatically update Budget Spent Amount for Expense
     if (type === 'expense') {
-      db.prepare(`
-        UPDATE budgets
-        SET spent_amount = spent_amount + ?
-        WHERE user_id = ? AND category = ?
-      `).run(numAmount, userId, category);
+      await Budget.updateOne(
+        { user_id: userId, category },
+        { $inc: { spent_amount: numAmount } }
+      );
     }
 
-    const created = db.prepare('SELECT * FROM transactions WHERE id = ?').get(id);
+    console.log('[TRANSACTIONS:POST] ✅ Transaction created.', { userId, txId: id, type, amount: numAmount, category });
     return res.status(201).json(formatTransaction(created));
   } catch (err: any) {
-    console.error('Error creating transaction:', err);
+    console.error('[TRANSACTIONS:POST] ❌ Failed to create transaction.', {
+      userId: req.user?.id,
+      message: err.message,
+      stack: err.stack,
+    });
     return res.status(500).json({ error: 'Failed to create transaction' });
   }
 });
 
 // DELETE /api/transactions/:id
-transactionsRouter.delete('/:id', (req: AuthenticatedRequest, res: Response) => {
+transactionsRouter.delete('/:id', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const id = String(req.params.id);
 
-    const tx = db
-      .prepare('SELECT * FROM transactions WHERE id = ? AND user_id = ?')
-      .get(id, userId) as any;
-
+    const tx = await Transaction.findOne({ _id: id, user_id: userId }).lean();
     if (!tx) {
+      console.warn('[TRANSACTIONS:DELETE] ⚠️ Transaction not found.', { userId, txId: id });
       return res.status(404).json({ error: 'Transaction not found' });
     }
 
@@ -174,28 +172,36 @@ transactionsRouter.delete('/:id', (req: AuthenticatedRequest, res: Response) => 
     else if (tx.type === 'expense') revertDelta = +amount;
 
     if (revertDelta !== 0) {
-      db.prepare(`
-        UPDATE accounts
-        SET balance = balance + ?, updated_at = ?
-        WHERE id = ? AND user_id = ?
-      `).run(revertDelta, now, tx.account_id, userId);
+      await Account.updateOne(
+        { _id: tx.account_id, user_id: userId },
+        { $inc: { balance: revertDelta }, $set: { updated_at: now } }
+      );
     }
 
     // Revert budget spent amount if expense
     if (tx.type === 'expense') {
-      db.prepare(`
-        UPDATE budgets
-        SET spent_amount = MAX(0, spent_amount - ?)
-        WHERE user_id = ? AND category = ?
-      `).run(amount, userId, tx.category);
+      const budget = await Budget.findOne({ user_id: userId, category: tx.category });
+      if (budget) {
+        const newSpent = Math.max(0, budget.spent_amount - amount);
+        await Budget.updateOne(
+          { _id: budget._id },
+          { $set: { spent_amount: newSpent } }
+        );
+      }
     }
 
-    // Delete transaction row
-    db.prepare('DELETE FROM transactions WHERE id = ? AND user_id = ?').run(id, userId);
+    // Delete transaction
+    await Transaction.deleteOne({ _id: id, user_id: userId });
 
+    console.log('[TRANSACTIONS:DELETE] ✅ Transaction deleted & balances reverted.', { userId, txId: id });
     return res.json({ message: 'Transaction deleted successfully' });
   } catch (err: any) {
-    console.error('Error deleting transaction:', err);
+    console.error('[TRANSACTIONS:DELETE] ❌ Failed to delete transaction.', {
+      userId: req.user?.id,
+      txId: req.params.id,
+      message: err.message,
+      stack: err.stack,
+    });
     return res.status(500).json({ error: 'Failed to delete transaction' });
   }
 });
