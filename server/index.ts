@@ -18,7 +18,7 @@ const isLocal = !process.env.VERCEL;
 
 // Middleware
 app.use(cors({
-  origin: isLocal ? true : ['https://fin-track-git-main-olawales-projects-b0db9459.vercel.app/', 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176'],
+  origin: isLocal ? true : ['https://fin-track-gamma-ten.vercel.app/', 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176'],
   credentials: true,
 }));
 app.use(express.json());
