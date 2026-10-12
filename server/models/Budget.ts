@@ -1,6 +1,6 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema } from 'mongoose';
 
-export interface IBudget extends Document {
+export interface IBudget {
   _id: string;
   user_id: string;
   category: string;

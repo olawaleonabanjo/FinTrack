@@ -1,11 +1,11 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { User } from '../models/User';
-import { Account } from '../models/Account';
-import { Budget } from '../models/Budget';
-import { Goal } from '../models/Goal';
-import { JWT_SECRET, requireAuth, AuthenticatedRequest } from '../middleware/auth';
+import { User } from '../models/User.js';
+import { Account } from '../models/Account.js';
+import { Budget } from '../models/Budget.js';
+import { Goal } from '../models/Goal.js';
+import { JWT_SECRET, requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
 
 export const authRouter = Router();
 

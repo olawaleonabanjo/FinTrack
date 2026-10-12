@@ -1,6 +1,6 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema } from 'mongoose';
 
-export interface IGoal extends Document {
+export interface IGoal {
   _id: string;
   user_id: string;
   name: string;

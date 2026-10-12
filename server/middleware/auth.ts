@@ -1,8 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { User } from '../models/User';
+import { User } from '../models/User.js';
 
-export const JWT_SECRET = process.env.JWT_SECRET || '{"error": {"code": "500", "message": "A server error has occurred"}}';
+const DEV_FALLBACK_JWT_SECRET = 'fintrack-dev-jwt-secret-change-me-in-vercel';
+
+export const JWT_SECRET = process.env.JWT_SECRET || DEV_FALLBACK_JWT_SECRET;
+
+if (!process.env.JWT_SECRET) {
+  console.warn('[AUTH:CONFIG] ⚠️ JWT_SECRET is not set. Using local fallback secret. Set JWT_SECRET in Vercel for production.');
+}
 
 export interface AuthenticatedUser {
   id: string;

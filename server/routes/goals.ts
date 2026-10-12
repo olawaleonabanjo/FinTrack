@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
-import { Goal } from '../models/Goal';
-import { Account } from '../models/Account';
-import { requireAuth, AuthenticatedRequest } from '../middleware/auth';
+import { Goal } from '../models/Goal.js';
+import { Account } from '../models/Account.js';
+import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
 
 export const goalsRouter = Router();
 

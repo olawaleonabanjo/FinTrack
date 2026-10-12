@@ -1,8 +1,8 @@
 import { Router, Response } from 'express';
-import { Transaction } from '../models/Transaction';
-import { Account } from '../models/Account';
-import { Budget } from '../models/Budget';
-import { requireAuth, AuthenticatedRequest } from '../middleware/auth';
+import { Transaction } from '../models/Transaction.js';
+import { Account } from '../models/Account.js';
+import { Budget } from '../models/Budget.js';
+import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
 
 export const transactionsRouter = Router();
 

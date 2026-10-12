@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
-import { Account } from '../models/Account';
-import { Transaction } from '../models/Transaction';
-import { requireAuth, AuthenticatedRequest } from '../middleware/auth';
+import { Account } from '../models/Account.js';
+import { Transaction } from '../models/Transaction.js';
+import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
 
 export const analyticsRouter = Router();
 
