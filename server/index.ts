@@ -13,10 +13,14 @@ import { analyticsRouter } from './routes/analytics';
 
 
 export const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = Number(process.env.PORT) || 5000;
+const isLocal = !process.env.VERCEL;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: isLocal ? true : [/\.vercel\.app$/, 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176'],
+  credentials: true,
+}));
 app.use(express.json());
 
 // Request logger with tagged output
@@ -64,12 +68,13 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   res.status(500).json({ error: 'Internal Server Error' });
 });
 
-// Start standalone HTTP listener only when run locally (not in serverless environment)
-if (!process.env.VERCEL) {
+// Start standalone HTTP listener only in local development.
+// On Vercel, the platform provides the host and executes this app automatically.
+if (isLocal) {
   (async () => {
     try {
       await connectDB();
-      app.listen(PORT, () => {
+      app.listen(PORT, '0.0.0.0', () => {
         console.log(`🚀 FinTrack Backend Server running on http://localhost:${PORT}`);
         console.log(`📡 API Endpoints available at http://localhost:${PORT}/api`);
         console.log(`🗄️  Database: MongoDB Atlas`);

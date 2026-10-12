@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User';
 
-export const JWT_SECRET = process.env.JWT_SECRET || 'fintrack_super_secret_jwt_key_2026';
+export const JWT_SECRET = process.env.JWT_SECRET || '{"error": {"code": "500", "message": "A server error has occurred"}}';
 
 export interface AuthenticatedUser {
   id: string;

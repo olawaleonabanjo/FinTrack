@@ -10,14 +10,14 @@ import { JWT_SECRET, requireAuth, AuthenticatedRequest } from '../middleware/aut
 export const authRouter = Router();
 
 // Map DB document to User frontend shape
-function formatUser(doc: any) {
+function formatUser(row: any) {
   return {
-    id: doc._id,
-    name: doc.name,
-    email: doc.email,
-    avatar: doc.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb',
-    currency: doc.currency || 'USD',
-    monthlyBudgetLimit: Number(doc.monthly_budget_limit || 6500),
+    id: row._id || row.id,
+    name: row.name,
+    email: row.email,
+    avatar: row.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb',
+    currency: row.currency || 'NGN',
+    monthlyBudgetLimit: Number(row.monthly_budget_limit || 6500),
   };
 }
 
@@ -27,7 +27,6 @@ authRouter.post('/register', async (req: Request, res: Response) => {
     const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
-      console.warn('[AUTH:REGISTER] ⚠️ Missing required fields.', { name: !!name, email: !!email, password: !!password });
       return res.status(400).json({ error: 'Name, email, and password are required.' });
     }
 
@@ -40,7 +39,6 @@ authRouter.post('/register', async (req: Request, res: Response) => {
     // Check if email already registered
     const existing = await User.findOne({ email: normalizedEmail }).lean();
     if (existing) {
-      console.warn('[AUTH:REGISTER] ⚠️ Duplicate email attempt.', { email: normalizedEmail });
       return res.status(400).json({ error: 'An account with this email address already exists.' });
     }
 
@@ -55,38 +53,16 @@ authRouter.post('/register', async (req: Request, res: Response) => {
       email: normalizedEmail,
       password_hash: passwordHash,
       avatar,
-      currency: 'USD',
+      currency: 'NGN',
       monthly_budget_limit: 5000,
       created_at: now,
     });
 
-    // Provide helpful starter accounts for the new user
+    // Provide helpful starter accounts and budgets for the new user
     const mainAccountId = `acc_${Date.now()}_1`;
     await Account.insertMany([
-      {
-        _id: mainAccountId,
-        user_id: userId,
-        name: 'Primary Checking',
-        type: 'checking',
-        balance: 3500,
-        account_number: '•••• 1010',
-        institution: 'Primary Bank',
-        color: '#6366f1',
-        currency: 'USD',
-        updated_at: now,
-      },
-      {
-        _id: `acc_${Date.now()}_2`,
-        user_id: userId,
-        name: 'Savings Vault',
-        type: 'savings',
-        balance: 8200,
-        account_number: '•••• 2020',
-        institution: 'High Yield Reserve',
-        color: '#10b981',
-        currency: 'USD',
-        updated_at: now,
-      },
+      { _id: mainAccountId, user_id: userId, name: 'Primary Checking', type: 'checking', balance: 3500, account_number: '•••• 1010', institution: 'Primary Bank', color: '#6366f1', currency: 'NGN', updated_at: now },
+      { _id: `acc_${Date.now()}_2`, user_id: userId, name: 'Savings Vault', type: 'savings', balance: 8200, account_number: '•••• 2020', institution: 'High Yield Reserve', color: '#10b981', currency: 'NGN', updated_at: now },
     ]);
 
     // Default budgets
@@ -99,17 +75,7 @@ authRouter.post('/register', async (req: Request, res: Response) => {
 
     // Default goal
     await Goal.create({
-      _id: `gl_${Date.now()}_1`,
-      user_id: userId,
-      name: 'Emergency Reserve',
-      target_amount: 15000,
-      current_amount: 4200,
-      deadline: '2026-12-31',
-      category: 'Savings',
-      color: '#10b981',
-      icon_name: 'ShieldCheck',
-      notes: 'Initial emergency safety cushion',
-      created_at: now,
+      _id: `gl_${Date.now()}_1`, user_id: userId, name: 'Emergency Reserve', target_amount: 15000, current_amount: 4200, deadline: '2026-12-31', category: 'Savings', color: '#10b981', icon_name: 'ShieldCheck', notes: 'Initial emergency safety cushion', created_at: now,
     });
 
     // Issue JWT token
@@ -117,19 +83,13 @@ authRouter.post('/register', async (req: Request, res: Response) => {
 
     const newUser = await User.findById(userId).select('_id name email avatar currency monthly_budget_limit').lean();
 
-    console.log('[AUTH:REGISTER] ✅ New user registered successfully.', { userId, email: normalizedEmail });
-
     return res.status(201).json({
       message: 'Account registered successfully',
       token,
       user: formatUser(newUser),
     });
   } catch (error: any) {
-    console.error('[AUTH:REGISTER] ❌ Registration failed.', {
-      message: error.message,
-      code: error.code,
-      stack: error.stack,
-    });
+    console.error('Registration error:', error);
     return res.status(500).json({ error: 'Internal server error while registering user' });
   }
 });
@@ -140,38 +100,30 @@ authRouter.post('/login', async (req: Request, res: Response) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      console.warn('[AUTH:LOGIN] ⚠️ Missing email or password.');
       return res.status(400).json({ error: 'Email and password are required.' });
     }
 
     const normalizedEmail = email.trim().toLowerCase();
-    const userDoc = await User.findOne({ email: normalizedEmail }).lean();
+    const userRow = await User.findOne({ email: normalizedEmail }).lean();
 
-    if (!userDoc) {
-      console.warn('[AUTH:LOGIN] ⚠️ No account found for email.', { email: normalizedEmail });
+    if (!userRow) {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
 
-    const isMatch = bcrypt.compareSync(password, userDoc.password_hash);
+    const isMatch = bcrypt.compareSync(password, userRow.password_hash);
     if (!isMatch) {
-      console.warn('[AUTH:LOGIN] ⚠️ Incorrect password attempt.', { email: normalizedEmail });
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
 
-    const token = jwt.sign({ id: userDoc._id, email: userDoc.email }, JWT_SECRET, { expiresIn: '7d' });
-
-    console.log('[AUTH:LOGIN] ✅ User logged in.', { userId: userDoc._id });
+    const token = jwt.sign({ id: userRow._id, email: userRow.email }, JWT_SECRET, { expiresIn: '7d' });
 
     return res.json({
       message: 'Logged in successfully',
       token,
-      user: formatUser(userDoc),
+      user: formatUser(userRow),
     });
   } catch (error: any) {
-    console.error('[AUTH:LOGIN] ❌ Login failed.', {
-      message: error.message,
-      stack: error.stack,
-    });
+    console.error('Login error:', error);
     return res.status(500).json({ error: 'Internal server error during authentication' });
   }
 });
@@ -191,7 +143,6 @@ authRouter.put('/profile', requireAuth, async (req: AuthenticatedRequest, res: R
 
     const current = await User.findById(userId).lean();
     if (!current) {
-      console.warn('[AUTH:PROFILE] ⚠️ User not found for profile update.', { userId });
       return res.status(404).json({ error: 'User not found' });
     }
 
@@ -205,18 +156,12 @@ authRouter.put('/profile', requireAuth, async (req: AuthenticatedRequest, res: R
 
     const updated = await User.findById(userId).select('_id name email avatar currency monthly_budget_limit').lean();
 
-    console.log('[AUTH:PROFILE] ✅ Profile updated.', { userId });
-
     return res.json({
       message: 'Profile updated successfully',
       user: formatUser(updated),
     });
   } catch (error: any) {
-    console.error('[AUTH:PROFILE] ❌ Profile update failed.', {
-      userId: req.user?.id,
-      message: error.message,
-      stack: error.stack,
-    });
+    console.error('Update profile error:', error);
     return res.status(500).json({ error: 'Failed to update profile' });
   }
 });
