@@ -22,7 +22,6 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json());
-
 // Request logger with tagged output
 app.use((req, res, next) => {
   const start = Date.now();

@@ -3,6 +3,7 @@ import {
   Search,
   Moon,
   Sun,
+  Monitor,
   Plus,
   Bell,
   Menu,
@@ -10,7 +11,7 @@ import {
   Euro,
   PoundSterling,
 } from 'lucide-react';
-import { useThemeStore } from '@/stores/useThemeStore';
+import { useThemeStore, ThemeMode } from '@/stores/useThemeStore';
 import { useFilterStore } from '@/stores/useFilterStore';
 import { Button } from '../common/Button';
 import { AddTransactionModal } from '@/features/transactions/AddTransactionModal';
@@ -20,17 +21,23 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ onOpenMobileSidebar }) => {
-  const { theme, toggleTheme, currency, setCurrency } = useThemeStore();
+  const { theme, themeMode, toggleTheme, currency, setCurrency, setThemeMode } = useThemeStore();
   const { searchQuery, setSearchQuery } = useFilterStore();
   const [isAddTxOpen, setIsAddTxOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
+  const themeOptions: { value: ThemeMode; label: string }[] = [
+    { value: 'system', label: 'System' },
+    { value: 'light', label: 'Light' },
+    { value: 'dark', label: 'Dark' },
+  ];
+
   const currencyOptions = [
-    { code: 'USD', symbol: '$', name: 'USD ($)' },
+    { code: 'NGN', symbol: '₦', name: 'NGN (₦)' },
     { code: 'EUR', symbol: '€', name: 'EUR (€)' },
     { code: 'GBP', symbol: '£', name: 'GBP (£)' },
     { code: 'CAD', symbol: 'CA$', name: 'CAD (CA$)' },
-    { code: 'NGN', symbol: '₦', name: 'NGN (₦)' },
+    { code: 'USD', symbol: '$', name: 'USD ($)' },
   ];
 
   return (
@@ -90,14 +97,34 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenMobileSidebar }) => {
             </select>
           </div>
 
-          {/* Dark / Light Toggle */}
-          <button
-            onClick={toggleTheme}
-            className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white bg-slate-100 dark:bg-dark-card border border-slate-200 dark:border-dark-border rounded-xl transition-colors"
-            title="Toggle theme"
-          >
-            {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
-          </button>
+          {/* Theme mode selector */}
+          <div className="flex items-center gap-1 rounded-xl border border-slate-200 dark:border-dark-border bg-slate-100 dark:bg-dark-card p-1">
+            <button
+              onClick={toggleTheme}
+              className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white rounded-lg transition-colors"
+              title="Toggle theme"
+              aria-label="Toggle theme"
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
+            </button>
+
+            <select
+              value={themeMode}
+              onChange={(e) => setThemeMode(e.target.value as ThemeMode)}
+              className="bg-transparent text-[10px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300 focus:outline-none cursor-pointer px-1.5 py-1.5"
+              aria-label="Theme mode selector"
+            >
+              {themeOptions.map((option) => (
+                <option key={option.value} value={option.value} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
+                  {option.label}
+                </option>
+              ))}
+            </select>
+
+            <div className="hidden sm:flex items-center justify-center w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+              <Monitor className="w-3.5 h-3.5" />
+            </div>
+          </div>
 
           {/* Notification Icon */}
           <div className="relative">

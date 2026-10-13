@@ -71,6 +71,19 @@ export interface User {
   avatar: string;
   currency: string;
   monthlyBudgetLimit: number;
+  phoneNumber?: string;
+  dateOfBirth?: string;
+  address?: string;
+  city?: string;
+  country?: string;
+  emergencyContact?: string;
+  emergencyPhone?: string;
+  bankName?: string;
+  accountHolderName?: string;
+  accountNumber?: string;
+  bankCode?: string;
+  iban?: string;
+  accountType?: string;
 }
 
 export interface AnalyticsOverview {

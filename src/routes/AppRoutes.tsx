@@ -7,6 +7,7 @@ import { BudgetsPage } from '@/pages/BudgetsPage';
 import { GoalsPage } from '@/pages/GoalsPage';
 import { AccountsPage } from '@/pages/AccountsPage';
 import { AnalyticsPage } from '@/pages/AnalyticsPage';
+import { ProfilePage } from '@/pages/ProfilePage';
 import { LoginPage } from '@/pages/LoginPage';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useAutoLogout } from '@/hooks/useAutoLogout';
@@ -80,6 +81,7 @@ export const AppRoutes: React.FC = () => {
         <Route path="goals" element={<GoalsPage />} />
         <Route path="accounts" element={<AccountsPage />} />
         <Route path="analytics" element={<AnalyticsPage />} />
+        <Route path="profile" element={<ProfilePage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

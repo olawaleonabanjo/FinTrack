@@ -18,6 +18,19 @@ function formatUser(row: any) {
     avatar: row.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb',
     currency: row.currency || 'NGN',
     monthlyBudgetLimit: Number(row.monthly_budget_limit || 6500),
+    phoneNumber: row.phone_number || '',
+    dateOfBirth: row.date_of_birth || '',
+    address: row.address || '',
+    city: row.city || '',
+    country: row.country || '',
+    emergencyContact: row.emergency_contact || '',
+    emergencyPhone: row.emergency_phone || '',
+    bankName: row.bank_name || '',
+    accountHolderName: row.account_holder_name || '',
+    accountNumber: row.account_number || '',
+    bankCode: row.bank_code || '',
+    iban: row.iban || '',
+    accountType: row.account_type || '',
   };
 }
 
@@ -139,7 +152,25 @@ authRouter.get('/me', requireAuth, (req: AuthenticatedRequest, res: Response) =>
 authRouter.put('/profile', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user!.id;
-    const { name, currency, monthlyBudgetLimit, avatar } = req.body;
+    const {
+      name,
+      currency,
+      monthlyBudgetLimit,
+      avatar,
+      phoneNumber,
+      dateOfBirth,
+      address,
+      city,
+      country,
+      emergencyContact,
+      emergencyPhone,
+      bankName,
+      accountHolderName,
+      accountNumber,
+      bankCode,
+      iban,
+      accountType,
+    } = req.body;
 
     const current = await User.findById(userId).lean();
     if (!current) {
@@ -151,10 +182,23 @@ authRouter.put('/profile', requireAuth, async (req: AuthenticatedRequest, res: R
     if (currency !== undefined) updates.currency = currency;
     if (monthlyBudgetLimit !== undefined) updates.monthly_budget_limit = Number(monthlyBudgetLimit);
     if (avatar !== undefined) updates.avatar = avatar;
+    if (phoneNumber !== undefined) updates.phone_number = phoneNumber;
+    if (dateOfBirth !== undefined) updates.date_of_birth = dateOfBirth;
+    if (address !== undefined) updates.address = address;
+    if (city !== undefined) updates.city = city;
+    if (country !== undefined) updates.country = country;
+    if (emergencyContact !== undefined) updates.emergency_contact = emergencyContact;
+    if (emergencyPhone !== undefined) updates.emergency_phone = emergencyPhone;
+    if (bankName !== undefined) updates.bank_name = bankName;
+    if (accountHolderName !== undefined) updates.account_holder_name = accountHolderName;
+    if (accountNumber !== undefined) updates.account_number = accountNumber;
+    if (bankCode !== undefined) updates.bank_code = bankCode;
+    if (iban !== undefined) updates.iban = iban;
+    if (accountType !== undefined) updates.account_type = accountType;
 
     await User.updateOne({ _id: userId }, { $set: updates });
 
-    const updated = await User.findById(userId).select('_id name email avatar currency monthly_budget_limit').lean();
+    const updated = await User.findById(userId).select('_id name email avatar currency monthly_budget_limit phone_number date_of_birth address city country emergency_contact emergency_phone bank_name account_holder_name account_number bank_code iban account_type').lean();
 
     return res.json({
       message: 'Profile updated successfully',

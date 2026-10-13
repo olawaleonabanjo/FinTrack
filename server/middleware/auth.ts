@@ -17,6 +17,19 @@ export interface AuthenticatedUser {
   avatar?: string;
   currency: string;
   monthly_budget_limit: number;
+  phone_number?: string;
+  date_of_birth?: string;
+  address?: string;
+  city?: string;
+  country?: string;
+  emergency_contact?: string;
+  emergency_phone?: string;
+  bank_name?: string;
+  account_holder_name?: string;
+  account_number?: string;
+  bank_code?: string;
+  iban?: string;
+  account_type?: string;
 }
 
 export interface AuthenticatedRequest extends Request {
@@ -40,7 +53,7 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
     const decoded = jwt.verify(token, JWT_SECRET) as { id: string; email: string };
 
     const user = await User.findById(decoded.id)
-      .select('_id name email avatar currency monthly_budget_limit')
+      .select('_id name email avatar currency monthly_budget_limit phone_number date_of_birth address city country emergency_contact emergency_phone bank_name account_holder_name account_number bank_code iban account_type')
       .lean();
 
     if (!user) {
@@ -58,6 +71,19 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
       avatar: user.avatar,
       currency: user.currency,
       monthly_budget_limit: user.monthly_budget_limit,
+      phone_number: user.phone_number,
+      date_of_birth: user.date_of_birth,
+      address: user.address,
+      city: user.city,
+      country: user.country,
+      emergency_contact: user.emergency_contact,
+      emergency_phone: user.emergency_phone,
+      bank_name: user.bank_name,
+      account_holder_name: user.account_holder_name,
+      account_number: user.account_number,
+      bank_code: user.bank_code,
+      iban: user.iban,
+      account_type: user.account_type,
     };
 
     next();
